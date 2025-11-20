@@ -76,6 +76,7 @@ jobs:
             - **macOS x86_64**: linkup-${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
             - **macOS ARM64**: linkup-${{ steps.version.outputs.version }}-macos-arm64.tar.gz
             - **Windows x86_64**: linkup-${{ steps.version.outputs.version }}-windows-x86_64.zip
+            - **Windows ARM64**: linkup-${{ steps.version.outputs.version }}-windows-arm64.zip
           draft: false
           prerelease: false
 
@@ -94,8 +95,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install cross
+        run: cargo install cross
+
       - name: Build
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+        run: cross build --release --target x86_64-unknown-linux-gnu
 
       - name: Package
         run: |
@@ -138,13 +142,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install ARM64 Cross Compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu pkg-config
+      - name: Install cross
+        run: cargo install cross
 
       - name: Build
-        run: cargo build --release --target aarch64-unknown-linux-gnu
+        run: cross build --release --target aarch64-unknown-linux-gnu
 
       - name: Package
         run: |
@@ -187,8 +189,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install cross
+        run: cargo install cross
+
       - name: Build
-        run: cargo build --release --target x86_64-apple-darwin
+        run: cross build --release --target x86_64-apple-darwin
 
       - name: Package
         run: |
@@ -231,8 +236,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install cross
+        run: cargo install cross
+
       - name: Build
-        run: cargo build --release --target aarch64-apple-darwin
+        run: cross build --release --target aarch64-apple-darwin
 
       - name: Package
         run: |
@@ -275,8 +283,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install cross
+        run: cargo install cross
+
       - name: Build
-        run: cargo build --release --target x86_64-pc-windows-msvc
+        run: cross build --release --target x86_64-pc-windows-msvc
 
       - name: Package
         shell: pwsh
@@ -305,4 +316,54 @@ jobs:
           upload_url: ${{ needs.auto-release.outputs.upload_url }}
           asset_path: ./target/x86_64-pc-windows-msvc/release/linkup-${{ needs.auto-release.outputs.version }}-windows-x86_64.zip.sha256
           asset_name: linkup-${{ needs.auto-release.outputs.version }}-windows-x86_64.zip.sha256
+          asset_content_type: text/plain
+
+  build-windows-arm64:
+    name: Build Windows ARM64
+    runs-on: windows-latest
+    needs: auto-release
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.auto-release.outputs.tag }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Build
+        run: cross build --release --target aarch64-pc-windows-msvc
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${{ needs.auto-release.outputs.version }}"
+          cd target/aarch64-pc-windows-msvc/release
+          Compress-Archive -Path linkup.exe -DestinationPath linkup-${version}-windows-arm64.zip
+          $hash = (Get-FileHash linkup-${version}-windows-arm64.zip -Algorithm SHA256).Hash
+          "$hash  linkup-${version}-windows-arm64.zip" | Out-File linkup-${version}-windows-arm64.zip.sha256
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/aarch64-pc-windows-msvc/release/linkup-${{ needs.auto-release.outputs.version }}-windows-arm64.zip
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-windows-arm64.zip
+          asset_content_type: application/zip
+
+      - name: Upload SHA256 Checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/aarch64-pc-windows-msvc/release/linkup-${{ needs.auto-release.outputs.version }}-windows-arm64.zip.sha256
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-windows-arm64.zip.sha256
           asset_content_type: text/plain
