@@ -2,11 +2,12 @@ name: Auto Release on Commit
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
