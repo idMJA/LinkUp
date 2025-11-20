@@ -1,0 +1,305 @@
+name: Auto Release on Commit
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  auto-release:
+    name: Auto Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Generate version from commit
+        id: version
+        run: |
+          # Create version from date and short commit hash
+          DATE=$(date +%Y%m%d)
+          COMMIT=$(git rev-parse --short HEAD)
+          VERSION="${DATE}-${COMMIT}"
+          TAG="v${VERSION}"
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "commit_short=$COMMIT" >> $GITHUB_OUTPUT
+          
+          # Get commit message
+          echo "commit_message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ steps.version.outputs.tag }} -m "Auto Release: ${{ steps.version.outputs.version }}"
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          release_name: Release ${{ steps.version.outputs.version }}
+          body: |
+            ## Auto Release from Commit
+            
+            **Version**: ${{ steps.version.outputs.version }}
+            **Commit**: ${{ steps.version.outputs.commit_short }}
+            
+            ### Commit Message
+            ```
+            ${{ steps.version.outputs.commit_message }}
+            ```
+            
+            ### Download Binaries
+            Download the binary for your platform from the assets below.
+            
+            - **Linux x86_64**: linkup-${{ steps.version.outputs.version }}-linux-x86_64.tar.gz
+            - **Linux ARM64**: linkup-${{ steps.version.outputs.version }}-linux-arm64.tar.gz
+            - **macOS x86_64**: linkup-${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
+            - **macOS ARM64**: linkup-${{ steps.version.outputs.version }}-macos-arm64.tar.gz
+            - **Windows x86_64**: linkup-${{ steps.version.outputs.version }}-windows-x86_64.zip
+          draft: false
+          prerelease: false
+
+  build-linux-x86_64:
+    name: Build Linux x86_64
+    runs-on: ubuntu-latest
+    needs: auto-release
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.auto-release.outputs.version }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Package
+        run: |
+          cd target/x86_64-unknown-linux-gnu/release
+          tar czf linkup-${{ needs.auto-release.outputs.version }}-linux-x86_64.tar.gz linkup
+          sha256sum linkup-${{ needs.auto-release.outputs.version }}-linux-x86_64.tar.gz > linkup-${{ needs.auto-release.outputs.version }}-linux-x86_64.tar.gz.sha256
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/x86_64-unknown-linux-gnu/release/linkup-${{ needs.auto-release.outputs.version }}-linux-x86_64.tar.gz
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-linux-x86_64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload SHA256 Checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/x86_64-unknown-linux-gnu/release/linkup-${{ needs.auto-release.outputs.version }}-linux-x86_64.tar.gz.sha256
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-linux-x86_64.tar.gz.sha256
+          asset_content_type: text/plain
+
+  build-linux-arm64:
+    name: Build Linux ARM64
+    runs-on: ubuntu-latest
+    needs: auto-release
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.auto-release.outputs.version }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install ARM64 Cross Compiler
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build
+        run: cargo build --release --target aarch64-unknown-linux-gnu
+
+      - name: Package
+        run: |
+          cd target/aarch64-unknown-linux-gnu/release
+          tar czf linkup-${{ needs.auto-release.outputs.version }}-linux-arm64.tar.gz linkup
+          sha256sum linkup-${{ needs.auto-release.outputs.version }}-linux-arm64.tar.gz > linkup-${{ needs.auto-release.outputs.version }}-linux-arm64.tar.gz.sha256
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/aarch64-unknown-linux-gnu/release/linkup-${{ needs.auto-release.outputs.version }}-linux-arm64.tar.gz
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-linux-arm64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload SHA256 Checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/aarch64-unknown-linux-gnu/release/linkup-${{ needs.auto-release.outputs.version }}-linux-arm64.tar.gz.sha256
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-linux-arm64.tar.gz.sha256
+          asset_content_type: text/plain
+
+  build-macos-x86_64:
+    name: Build macOS x86_64
+    runs-on: macos-latest
+    needs: auto-release
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.auto-release.outputs.version }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Package
+        run: |
+          cd target/x86_64-apple-darwin/release
+          tar czf linkup-${{ needs.auto-release.outputs.version }}-macos-x86_64.tar.gz linkup
+          shasum -a 256 linkup-${{ needs.auto-release.outputs.version }}-macos-x86_64.tar.gz > linkup-${{ needs.auto-release.outputs.version }}-macos-x86_64.tar.gz.sha256
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/x86_64-apple-darwin/release/linkup-${{ needs.auto-release.outputs.version }}-macos-x86_64.tar.gz
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-macos-x86_64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload SHA256 Checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/x86_64-apple-darwin/release/linkup-${{ needs.auto-release.outputs.version }}-macos-x86_64.tar.gz.sha256
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-macos-x86_64.tar.gz.sha256
+          asset_content_type: text/plain
+
+  build-macos-arm64:
+    name: Build macOS ARM64
+    runs-on: macos-latest
+    needs: auto-release
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.auto-release.outputs.version }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Package
+        run: |
+          cd target/aarch64-apple-darwin/release
+          tar czf linkup-${{ needs.auto-release.outputs.version }}-macos-arm64.tar.gz linkup
+          shasum -a 256 linkup-${{ needs.auto-release.outputs.version }}-macos-arm64.tar.gz > linkup-${{ needs.auto-release.outputs.version }}-macos-arm64.tar.gz.sha256
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/aarch64-apple-darwin/release/linkup-${{ needs.auto-release.outputs.version }}-macos-arm64.tar.gz
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-macos-arm64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload SHA256 Checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/aarch64-apple-darwin/release/linkup-${{ needs.auto-release.outputs.version }}-macos-arm64.tar.gz.sha256
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-macos-arm64.tar.gz.sha256
+          asset_content_type: text/plain
+
+  build-windows-x86_64:
+    name: Build Windows x86_64
+    runs-on: windows-latest
+    needs: auto-release
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.auto-release.outputs.version }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${{ needs.auto-release.outputs.version }}"
+          cd target/x86_64-pc-windows-msvc/release
+          Compress-Archive -Path linkup.exe -DestinationPath linkup-${version}-windows-x86_64.zip
+          $hash = (Get-FileHash linkup-${version}-windows-x86_64.zip -Algorithm SHA256).Hash
+          "$hash  linkup-${version}-windows-x86_64.zip" | Out-File linkup-${version}-windows-x86_64.zip.sha256
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/x86_64-pc-windows-msvc/release/linkup-${{ needs.auto-release.outputs.version }}-windows-x86_64.zip
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-windows-x86_64.zip
+          asset_content_type: application/zip
+
+      - name: Upload SHA256 Checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.auto-release.outputs.upload_url }}
+          asset_path: ./target/x86_64-pc-windows-msvc/release/linkup-${{ needs.auto-release.outputs.version }}-windows-x86_64.zip.sha256
+          asset_name: linkup-${{ needs.auto-release.outputs.version }}-windows-x86_64.zip.sha256
+          asset_content_type: text/plain
