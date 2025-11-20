@@ -1,5 +1,8 @@
 name: Auto Release on Commit
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ master ]
@@ -16,6 +19,7 @@ jobs:
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -82,7 +86,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: ${{ needs.auto-release.outputs.version }}
+          ref: ${{ needs.auto-release.outputs.tag }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -126,7 +130,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: ${{ needs.auto-release.outputs.version }}
+          ref: ${{ needs.auto-release.outputs.tag }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -173,7 +177,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: ${{ needs.auto-release.outputs.version }}
+          ref: ${{ needs.auto-release.outputs.tag }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -217,7 +221,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: ${{ needs.auto-release.outputs.version }}
+          ref: ${{ needs.auto-release.outputs.tag }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -261,7 +265,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: ${{ needs.auto-release.outputs.version }}
+          ref: ${{ needs.auto-release.outputs.tag }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
