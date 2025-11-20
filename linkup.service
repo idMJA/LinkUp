@@ -1,0 +1,21 @@
+[Unit]
+Description=LinkUp - Ngrok Manager Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%USER%
+WorkingDirectory=%WORKING_DIR%
+ExecStart=%BINARY_PATH%
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening (optional)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

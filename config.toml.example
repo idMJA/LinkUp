@@ -1,0 +1,44 @@
+# LinkUp Configuration File
+# Copy this file to config.toml and fill in your values
+
+# Ngrok instances configuration
+# You can add multiple ngrok instances with different tokens
+[[ngrok_instances]]
+name = "instance1"
+authtoken = "your_ngrok_token_1"
+port = 8080
+protocol = "http"  # http or tcp
+region = "us"  # us, eu, ap, au, sa, jp, in
+
+[[ngrok_instances]]
+name = "instance2"
+authtoken = "your_ngrok_token_2"
+port = 3000
+protocol = "http"
+region = "us"
+
+# Webhook notifications configuration
+[[webhooks]]
+name = "discord"
+type = "discord"
+url = "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+enabled = true
+
+# Uncomment below to add more webhooks
+# [[webhooks]]
+# name = "slack"
+# type = "slack"
+# url = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+# enabled = true
+
+# [[webhooks]]
+# name = "custom-webhook"
+# type = "generic"
+# url = "https://your-api.com/webhook"
+# enabled = true
+
+# General settings
+[settings]
+check_interval_seconds = 60  # How often to check ngrok status (in seconds)
+auto_restart = true  # Auto restart ngrok if it fails
+log_level = "info"  # debug, info, warn, error
