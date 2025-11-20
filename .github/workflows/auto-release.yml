@@ -3,10 +3,6 @@ name: Auto Release on Commit
 on:
   push:
     branches: [ master ]
-    paths:
-      - 'src/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
   workflow_dispatch:
 
 env:
@@ -47,7 +43,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a ${{ steps.version.outputs.tag }} -m "Auto Release: ${{ steps.version.outputs.version }}"
-          git push origin ${{ steps.version.outputs.tag }}
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git ${{ steps.version.outputs.tag }}
 
       - name: Create Release
         id: create_release
